@@ -1,0 +1,45 @@
+:root {
+    --plyr-color-main: #e50914;
+    --plyr-badge-text-color:#e50914;
+    /* --plyr-video-controls-background:#31724e; */
+    --plyr-menu-background: #5A5A5A;
+    --plyr-menu-color: #ffffff;
+    --plyr-menu-item-arrow-color: #e50914;
+    --plyr-menu-s: #e50914;
+    
+
+  }
+
+.plyr {
+    width: 100% !important; /* Ensure full width */
+    max-width: 100%;
+    display: block;
+    margin: 0 auto;
+  }
+  
+
+  
+#player {
+    width: 100%;
+    height: auto;
+    max-height: 400px; /* Restrict to 400px in regular mode */
+    margin: 0 auto;
+    display: block;
+}
+
+:fullscreen #player,
+.plyr--fullscreen #player {
+    max-height: 100vh;  /* Full-screen should be 100vh */
+}
+  
+  .video-container {
+    padding: 0;
+    margin: 0;
+  }
+  
+  .site-video {
+    padding: 0 !important;
+  }
+  
+
+  
