@@ -1,7 +1,6 @@
 "use client";
 
-import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import "./hls-player.css";
 
 declare global {
@@ -16,101 +15,156 @@ interface HLSPlayerProps {
 }
 
 const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoSource }) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!videoRef.current) return;
-
-    if (!window.Plyr || !window.Hls) {
-      console.log("[v0] Waiting for Plyr and HLS.js to load...");
-      return;
-    }
+    setIsLoading(true);
+    setError(null);
 
     const video = videoRef.current;
-    const Hls = window.Hls;
     const Plyr = window.Plyr;
-    let hls: any = null;
+    const Hls = window.Hls;
+    let hlsInstance: any = null;
+    let plyrInstance: any = null;
 
-    try {
-      if (Hls.isSupported()) {
-        hls = new Hls();
-        hls.loadSource(videoSource);
-        hls.attachMedia(video);
+    const isHls = videoSource?.toLowerCase().includes(".m3u8");
+    const canPlayNative = (type: string) => video.canPlayType(type) !== "";
 
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          const player = new Plyr(video, {
-            controls: [
-              "play-large",
-              "restart",
-              "rewind",
-              "play",
-              "fast-forward",
-              "progress",
-              "current-time",
-              "duration",
-              "mute",
-              "volume",
-              "settings",
-              "pip",
-              "fullscreen",
-            ],
-            quality: {
-              default: hls.levels[0]?.height || 720,
-              options: hls.levels.map((level: any) => level.height),
-              forced: true,
-              onChange: (newQuality: number) => {
-                hls.levels.forEach((level: any, levelIndex: number) => {
-                  if (level.height === newQuality) {
-                    hls.currentLevel = levelIndex;
-                  }
-                });
-              },
-            },
-          });
+    (async () => {
+      try {
+        if (isHls) {
+          // HLS path (existing)
+          if (!Hls || !Plyr) {
+            setError("Player libraries not loaded yet.");
+            setIsLoading(false);
+            return;
+          }
 
-          setIsLoading(false);
-          setError(null);
-        });
+          if (Hls.isSupported()) {
+            hlsInstance = new Hls();
+            hlsInstance.loadSource(videoSource);
+            hlsInstance.attachMedia(video);
 
-        hls.on(Hls.Events.ERROR, (event: any, data: any) => {
-          if (data.fatal) {
-            setError("Failed to load video. Please check the URL.");
+            hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+              plyrInstance = new Plyr(video, {
+                /* your controls */
+              });
+              setIsLoading(false);
+            });
+
+            hlsInstance.on(Hls.Events.ERROR, (event: any, data: any) => {
+              if (data.fatal) {
+                setError("Failed to load HLS stream.");
+                setIsLoading(false);
+              }
+            });
+          } else if (canPlayNative("application/vnd.apple.mpegurl")) {
+            // Safari native
+            video.src = videoSource;
+            plyrInstance = new Plyr(video);
+            setIsLoading(false);
+          } else {
+            setError("HLS not supported in this browser.");
             setIsLoading(false);
           }
-        });
-      } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-        // Safari native HLS support
-        video.src = videoSource;
-        const player = new Plyr(video, {
-          controls: [
-            "play-large",
-            "restart",
-            "rewind",
-            "play",
-            "fast-forward",
-            "progress",
-            "current-time",
-            "duration",
-            "mute",
-            "volume",
-            "settings",
-            "pip",
-            "fullscreen",
-          ],
-        });
+        } else {
+          // Direct file (mp4, mkv, webm, etc.)
+          // Prefer MP4 (H.264/AAC) for compatibility.
+          video.src = videoSource;
+
+          // Quick capability check
+          if (
+            videoSource.toLowerCase().endsWith(".mp4") &&
+            canPlayNative("video/mp4")
+          ) {
+            plyrInstance = new Plyr(video, {
+              /* controls */
+            });
+            // load metadata to know when ready
+            video.addEventListener(
+              "loadedmetadata",
+              () => setIsLoading(false),
+              { once: true }
+            );
+            video.addEventListener(
+              "error",
+              () => {
+                setError("Cannot play this MP4 file in this browser.");
+                setIsLoading(false);
+              },
+              { once: true }
+            );
+          } else if (videoSource.toLowerCase().endsWith(".mkv")) {
+            // Try to play MKV — may fail depending on browser
+            if (
+              canPlayNative("video/webm") ||
+              canPlayNative("video/ogg") ||
+              canPlayNative("video/mp4")
+            ) {
+              plyrInstance = new Plyr(video, {
+                /* controls */
+              });
+              video.addEventListener(
+                "loadedmetadata",
+                () => setIsLoading(false),
+                { once: true }
+              );
+              video.addEventListener(
+                "error",
+                () => {
+                  setError(
+                    "This MKV isn't playable in your browser. Convert to MP4 (H.264/AAC) for best compatibility."
+                  );
+                  setIsLoading(false);
+                },
+                { once: true }
+              );
+            } else {
+              setError(
+                "MKV playback not supported in this browser. Convert to MP4 (H.264/AAC)."
+              );
+              setIsLoading(false);
+            }
+          } else {
+            // other formats (webm...) — try to play and handle error
+            plyrInstance = new Plyr(video, {
+              /* controls */
+            });
+            video.addEventListener(
+              "loadedmetadata",
+              () => setIsLoading(false),
+              { once: true }
+            );
+            video.addEventListener(
+              "error",
+              () => {
+                setError("Cannot play this file type in your browser.");
+                setIsLoading(false);
+              },
+              { once: true }
+            );
+          }
+        }
+      } catch (err) {
+        console.error(err);
+        setError("An unexpected error occurred while initializing the player.");
         setIsLoading(false);
       }
-    } catch (err) {
-      setError("An error occurred while loading the video.");
-      setIsLoading(false);
-    }
+    })();
 
     return () => {
-      if (hls) {
-        hls.destroy();
-      }
+      try {
+        if (hlsInstance) hlsInstance.destroy();
+      } catch {}
+      try {
+        if (plyrInstance && typeof plyrInstance.destroy === "function")
+          plyrInstance.destroy();
+      } catch {}
+      video.removeAttribute("src");
+      video.load();
     };
   }, [videoSource]);
 
@@ -134,11 +188,7 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoSource }) => {
         </div>
       )}
 
-      <video
-        ref={videoRef}
-        className="w-full h-auto"
-        style={{ display: isLoading || error ? "none" : "block" }}
-      />
+      <video ref={videoRef} className="w-full h-auto" controls />
     </div>
   );
 };

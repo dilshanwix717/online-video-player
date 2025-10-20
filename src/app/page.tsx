@@ -1,10 +1,18 @@
+// /src/app/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import HLSPlayer from "@/components/hls-player";
 import VideoInputForm from "@/components/video-input-form";
 
-export default function Home() {
+// shadcn/ui imports
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+
+const SAMPLE_HLS =
+  "https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8";
+
+const Home = () => {
   const [videoUrl, setVideoUrl] = useState<string>("");
   const [isPlaying, setIsPlaying] = useState(false);
 
@@ -17,6 +25,23 @@ export default function Home() {
     setVideoUrl("");
     setIsPlaying(false);
   };
+
+  const handleTryHLS = () => {
+    setVideoUrl(SAMPLE_HLS);
+    setIsPlaying(true);
+  };
+
+  const sourceType = useMemo(() => {
+    try {
+      const u = new URL(videoUrl);
+      if (
+        u.pathname.toLowerCase().includes(".m3u8") ||
+        u.href.toLowerCase().includes(".m3u8")
+      )
+        return "hls";
+    } catch {}
+    return "progressive";
+  }, [videoUrl]);
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
@@ -34,7 +59,7 @@ export default function Home() {
                   <path d="M2 6a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zm4 2v4h8V8H6z" />
                 </svg>
               </div>
-              <h1 className="text-2xl font-bold text-white">StreamPlay</h1>
+              <h1 className="text-2xl font-bold text-white">WIXPlayer</h1>
             </div>
             <p className="text-slate-400 text-sm">HLS Video Player</p>
           </div>
@@ -50,24 +75,78 @@ export default function Home() {
                 Stream Your HLS Videos
               </h2>
               <p className="text-lg text-slate-400 text-balance">
-                Paste your HLS video link and start playing instantly
+                Paste your video link and start playing instantly —{" "}
+                <span className="font-semibold">.m3u8 (HLS)</span> is
+                recommended for the best streaming experience.
               </p>
             </div>
 
             <VideoInputForm onPlayVideo={handlePlayVideo} />
+
+            {/* Quick HLS CTA */}
+            <div className="mt-6 text-center">
+              <p className="text-sm text-slate-400 mb-3">
+                Want to try HLS right away?
+              </p>
+              <Button
+                onClick={handleTryHLS}
+                className="inline-flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-900 font-semibold rounded-lg shadow-lg"
+              >
+                Try a sample HLS stream
+              </Button>
+            </div>
           </div>
         ) : (
           // Player Section
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-white">Now Playing</h2>
-              <button
+              <div className="flex items-center gap-4">
+                <h2 className="text-2xl font-bold text-white">Now Playing</h2>
+                <span
+                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
+                    ${
+                      sourceType === "hls"
+                        ? "bg-emerald-700 text-emerald-100"
+                        : "bg-slate-700 text-slate-200"
+                    }`}
+                >
+                  {sourceType === "hls"
+                    ? "HLS (m3u8) — recommended"
+                    : "Progressive (mp4/mkv)"}
+                </span>
+              </div>
+
+              {/* use shadcn Button but keep same appearance via className */}
+              <Button
                 onClick={handleReset}
                 className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors duration-200 text-sm font-medium"
               >
                 Load New Video
-              </button>
+              </Button>
             </div>
+
+            {/* If non-HLS, show gentle suggestion */}
+            {sourceType !== "hls" && (
+              <Card className="bg-yellow-950/20 border border-yellow-900/30 rounded-lg p-0">
+                <CardContent className="p-4 flex items-center gap-3">
+                  <div className="flex-1">
+                    <p className="text-sm text-yellow-200">
+                      Tip: For adaptive streaming, lower buffering and better
+                      quality switching, try an
+                      <span className="font-semibold"> .m3u8 (HLS) </span>{" "}
+                      stream. You can
+                      <button
+                        onClick={handleTryHLS}
+                        className="ml-2 underline text-yellow-100"
+                      >
+                        try a sample HLS stream
+                      </button>
+                      .
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Video Player Container */}
             <div className="bg-black rounded-xl overflow-hidden shadow-2xl border border-slate-800">
@@ -75,17 +154,21 @@ export default function Home() {
             </div>
 
             {/* Video Info */}
-            <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6">
-              <h3 className="text-sm font-semibold text-slate-400 mb-2">
-                Video URL
-              </h3>
-              <p className="text-slate-300 text-sm break-all font-mono bg-slate-950 p-3 rounded border border-slate-800">
-                {videoUrl}
-              </p>
-            </div>
+            <Card className="bg-slate-900/50 border border-slate-800 rounded-lg p-0">
+              <CardContent className="p-6">
+                <h3 className="text-sm font-semibold text-slate-400 mb-2">
+                  Video URL
+                </h3>
+                <p className="text-slate-300 text-sm break-all font-mono bg-slate-950 p-3 rounded border border-slate-800">
+                  {videoUrl}
+                </p>
+              </CardContent>
+            </Card>
           </div>
         )}
       </div>
     </main>
   );
-}
+};
+
+export default Home;
